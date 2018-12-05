@@ -44,6 +44,7 @@ import java.util.UUID;
 @TargetApi(21)
 public class MainActivity extends AppCompatActivity {
     private static final long SCAN_PERIOD = 10000;
+    public static final String MAC_ADDRESS = "0C:B2:B7:7B:C5:12";
     BluetoothGattCharacteristic characteristic;
     public final static String ACTION_GATT_CONNECTED =
             "com.example.bluetooth.le.ACTION_GATT_CONNECTED";
@@ -200,7 +201,7 @@ public class MainActivity extends AppCompatActivity {
                         Log.i("result", result.toString());
                         BluetoothDevice btDevice = result.getDevice();
                         Log.d("device", btDevice.getAddress());
-                        if (btDevice.getAddress().equalsIgnoreCase("0C:B2:B7:7B:C5:12")) {
+                        if (btDevice.getAddress().equalsIgnoreCase(MAC_ADDRESS)) {
                             connectToDevice(btDevice);
                         }
                     }
