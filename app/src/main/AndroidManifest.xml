@@ -33,7 +33,8 @@
             </intent-filter>
         </activity>
         <activity android:name=".vehicleSelection" />
-        <activity android:name=".UserlocationActivity"></activity>
+        <activity android:name=".UserlocationActivity" />
+        <activity android:name=".RideStatus"></activity>
     </application>
 
 </manifest>

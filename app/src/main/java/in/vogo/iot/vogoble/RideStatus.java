@@ -1,9 +1,7 @@
 package in.vogo.iot.vogoble;
 
-import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.app.Dialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
@@ -25,24 +23,20 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Build;
-import android.os.Bundle;
 import android.os.Handler;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.CompoundButton;
-import android.widget.Switch;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-@TargetApi(21)
-public class MainActivity extends AppCompatActivity {
+public class RideStatus extends AppCompatActivity {
     private static final long SCAN_PERIOD = 10000;
     public static final String MAC_ADDRESS = "3C:A3:08:90:A3:92";
     BluetoothGattCharacteristic characteristic;
@@ -60,6 +54,8 @@ public class MainActivity extends AppCompatActivity {
     private static final int STATE_CONNECTING = 1;
     private static final int STATE_CONNECTED = 2;
     private int mConnectionState = STATE_DISCONNECTED;
+    boolean ridePause = false;
+    boolean bleConnected =false;
 
     private final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
         @Override
@@ -114,7 +110,7 @@ public class MainActivity extends AppCompatActivity {
         public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
             super.onCharacteristicChanged(gatt, characteristic);
             Log.i("onCharacteristic", new String(characteristic.getValue()));
-                broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
+            broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
         }
     };
 
@@ -130,20 +126,22 @@ public class MainActivity extends AppCompatActivity {
             android.Manifest.permission.ACCESS_FINE_LOCATION,
             android.Manifest.permission.BLUETOOTH
     };
-    Button toggle;
+    //Button toggle;
     boolean isunlocked = true;
     private BluetoothAdapter.LeScanCallback mLeScanCallback;
 
     private ScanCallback mScanCallback;
+    Button b1,b2;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_ride_status);
+        Log.d("Oncreate", "RideActivity");
+
         if(!hasPermissions(this, PERMISSIONS)){
             ActivityCompat.requestPermissions(this, PERMISSIONS, PERMISSION_ALL);
         }
-        toggle = (Button) findViewById(R.id.btn_major);
 
         mHandler = new Handler();
         if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
@@ -154,28 +152,54 @@ public class MainActivity extends AppCompatActivity {
         final BluetoothManager bluetoothManager =
                 (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         mBluetoothAdapter = bluetoothManager.getAdapter();
-       // toggle.setEnabled(false);
-        toggle.setOnClickListener(new View.OnClickListener() {
+        b1 = (Button) findViewById(R.id.ridePause);
+        b2 = (Button) findViewById(R.id.rideEnd);
+        final Handler handler = new Handler();
+
+        b1.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(isunlocked){
-                    isunlocked = false;
-                    //toggle.setText("Lock");
-                    send("1".getBytes());
-                }
-                else {
-                    isunlocked = true;
-                   // toggle.setText("Unlock");
-                    //send("0".getBytes());
+                if (bleConnected) {
+                    ridePause = true;
+                    mHandler.removeCallbacks(r);
+                    send("3".getBytes());
+                } else {
+                    ridePause = true;
+                    handler.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            scanLeDevice(true);
+                        }
+                    }, 2000);
                 }
             }
         });
 
+        b2.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (bleConnected) {
+                    ridePause = false;
+                    mHandler.removeCallbacks(r);
+                    send("2".getBytes());
+                } else {
+                    ridePause = false;
+                    handler.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            scanLeDevice(true);
+                        }
+                    }, 2000);
+                }
+            }
+        });
     }
+
 
     @Override
     protected void onResume() {
         super.onResume();
+        Log.i("result", "On resume");
         if (mBluetoothAdapter == null || !mBluetoothAdapter.isEnabled()) {
             Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
@@ -220,8 +244,8 @@ public class MainActivity extends AppCompatActivity {
                 };
             }
             else{
-                    // For old version of android.
-                  mLeScanCallback = new BluetoothAdapter.LeScanCallback() {
+                // For old version of android.
+                mLeScanCallback = new BluetoothAdapter.LeScanCallback() {
                     @Override
                     public void onLeScan(final BluetoothDevice device, int rssi,
                                          byte[] scanRecord) {
@@ -237,7 +261,7 @@ public class MainActivity extends AppCompatActivity {
                     }
                 };
             }
-            scanLeDevice(true);
+            // scanLeDevice(true);
         }
     }
 
@@ -370,26 +394,25 @@ public class MainActivity extends AppCompatActivity {
                                  final BluetoothGattCharacteristic characteristic) {
         final Intent intent = new Intent(action);
 
-            // For all other profiles, writes the data formatted in HEX.
-            final byte[] data = characteristic.getValue();
-            if (data != null && data.length > 0) {
-                final StringBuilder stringBuilder = new StringBuilder(data.length);
-                for(byte byteChar : data)
-                    stringBuilder.append(String.format("%02X ", byteChar));
-                intent.putExtra(EXTRA_DATA, new String(data));
+        // For all other profiles, writes the data formatted in HEX.
+        final byte[] data = characteristic.getValue();
+        if (data != null && data.length > 0) {
+            final StringBuilder stringBuilder = new StringBuilder(data.length);
+            for(byte byteChar : data)
+                stringBuilder.append(String.format("%02X ", byteChar));
+            intent.putExtra(EXTRA_DATA, new String(data));
 
         }
         sendBroadcast(intent);
     }
 
     public void close() {
-        unregisterReceiver(mGattUpdateReceiver);
-
         if (mGatt == null) {
             return;
         }
         mGatt.close();
         mGatt = null;
+        bleConnected = false;
     }
 
     // Handles various events fired by the Service.
@@ -404,36 +427,48 @@ public class MainActivity extends AppCompatActivity {
             final String action = intent.getAction();
             if (ACTION_GATT_CONNECTED.equals(action)) {
                 Toast.makeText(getApplicationContext(),"Connected",Toast.LENGTH_LONG).show();
-                toggle.setEnabled(true);
+              //  toggle.setEnabled(true);
             } else if (ACTION_GATT_DISCONNECTED.equals(action)) {
                 Toast.makeText(getApplicationContext(),"DisConnected",Toast.LENGTH_LONG).show();
-                toggle.setEnabled(false);
+              //  toggle.setEnabled(false);
             }  else if (ACTION_DATA_AVAILABLE.equals(action)) {
                 displayData(intent.getStringExtra(EXTRA_DATA));
             }
             else if(ACTION_GATT_SERVICES_DISCOVERED.equals(action)){
                 Toast.makeText(getApplicationContext(),"Service Found",Toast.LENGTH_LONG).show();
+                bleConnected = true;
+                if(ridePause)
+                    send("3".getBytes());
+                else
+                    send("2".getBytes());
             }
         }
     };
-
+    Runnable r = new Runnable() {
+        @Override
+        public void run() {
+            close();
+        }
+    };
     private void displayData(String stringExtra) {
 
-        if(stringExtra.equalsIgnoreCase("1")){
+        if(stringExtra.equalsIgnoreCase("0")) {
+            Toast.makeText(this,stringExtra+" Failed",Toast.LENGTH_LONG).show();
+            mHandler.postDelayed(r, 10000);
+          //  showDialog();
+        }
+        else if(stringExtra.equalsIgnoreCase("1")){
+            Toast.makeText(this,stringExtra,Toast.LENGTH_LONG).show();
+            Log.d("BLE", "done");
             close();
-            Intent intent = new Intent(MainActivity.this, RideStatus.class);
-            //intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+            Intent intent = new Intent(RideStatus.this, MainActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             startActivity(intent);
         }
-
-       if(stringExtra.equalsIgnoreCase("4")) {
-           Toast.makeText(this,stringExtra,Toast.LENGTH_LONG).show();
-           Log.d("BLE", "long Pressed");
-           showDialog();
-       }
-       else{
-           Toast.makeText(this,stringExtra,Toast.LENGTH_SHORT).show();
-       }
+        else{
+            Toast.makeText(this,stringExtra,Toast.LENGTH_SHORT).show();
+        }
     }
 
 
