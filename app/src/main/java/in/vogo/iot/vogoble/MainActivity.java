@@ -423,11 +423,11 @@ public class MainActivity extends AppCompatActivity {
                 appdata.setServiceDiscovered(true);
                 appdata.setTimeStamp(new Date().toString());
                 StringBuffer infoBuffer = new StringBuffer();
-                infoBuffer.append("Model :" + Build.MODEL + "\n");//The end-user-visible name for the end product.
-                infoBuffer.append("Device: " + Build.DEVICE + "\n");//The name of the industrial design.
-                infoBuffer.append("Manufacturer: " + Build.MANUFACTURER + "\n");//The manufacturer of the product/hardware.
-                infoBuffer.append("Board: " + Build.BOARD + "\n");//The name of the underlying board, like "goldfish".
-                infoBuffer.append("Brand: " + Build.BRAND + "\n");//The consumer-visible brand with which the product/hardware will be associated, if any.
+                infoBuffer.append("Model :" + Build.MODEL + "\n");
+                infoBuffer.append("Device: " + Build.DEVICE + "\n");
+                infoBuffer.append("Manufacturer: " + Build.MANUFACTURER + "\n");
+                infoBuffer.append("Board: " + Build.BOARD + "\n");
+                infoBuffer.append("Brand: " + Build.BRAND + "\n");
                 infoBuffer.append("Serial: " + Build.SERIAL + "\n");
                 appdata.setDeviceName(infoBuffer.toString());
 
