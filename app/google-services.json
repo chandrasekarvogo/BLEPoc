@@ -1,0 +1,99 @@
+{
+  "project_info": {
+    "project_number": "790704098872",
+    "firebase_url": "https://vogobluetooth.firebaseio.com",
+    "project_id": "vogobluetooth",
+    "storage_bucket": "vogobluetooth.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:790704098872:android:50fcb4fb7fa360c7",
+        "android_client_info": {
+          "package_name": "in.vogo.iot.vogoble"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "790704098872-utam2qntri0dj9fmbrj155hr88e2j0hl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "in.vogo.iot.vogoble",
+            "certificate_hash": "d76edd8884d0ffcf6a9fe814ebc63ad776af6ec4"
+          }
+        },
+        {
+          "client_id": "790704098872-tu9fnhe3dtoag1odnghuub6mqrt0u95t.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDCD8PPZt2WRv0XOZ8qLkgBDU4cSi2rIsU"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 2,
+          "other_platform_oauth_client": [
+            {
+              "client_id": "790704098872-tu9fnhe3dtoag1odnghuub6mqrt0u95t.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:790704098872:android:3b39cb7c40dbf718",
+        "android_client_info": {
+          "package_name": "in.vogo.iot.vogobluetooth"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "790704098872-eqcr4n84c99u5uh5hvag5qeg9uvikrll.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "in.vogo.iot.vogobluetooth",
+            "certificate_hash": "d76edd8884d0ffcf6a9fe814ebc63ad776af6ec4"
+          }
+        },
+        {
+          "client_id": "790704098872-tu9fnhe3dtoag1odnghuub6mqrt0u95t.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDCD8PPZt2WRv0XOZ8qLkgBDU4cSi2rIsU"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 2,
+          "other_platform_oauth_client": [
+            {
+              "client_id": "790704098872-tu9fnhe3dtoag1odnghuub6mqrt0u95t.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
