@@ -27,6 +27,7 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -37,7 +38,13 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
@@ -60,6 +67,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int STATE_CONNECTING = 1;
     private static final int STATE_CONNECTED = 2;
     private int mConnectionState = STATE_DISCONNECTED;
+    Appdata appdata;
 
     private final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
         @Override
@@ -135,11 +143,16 @@ public class MainActivity extends AppCompatActivity {
     private BluetoothAdapter.LeScanCallback mLeScanCallback;
 
     private ScanCallback mScanCallback;
-
+    FirebaseDatabase firebaseDatabase;
+    DatabaseReference databaseReference;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        appdata = new Appdata();
+        firebaseDatabase = FirebaseDatabase.getInstance();
+        firebaseDatabase.setPersistenceEnabled(true);
+        databaseReference = firebaseDatabase.getReference("bleData");
         if(!hasPermissions(this, PERMISSIONS)){
             ActivityCompat.requestPermissions(this, PERMISSIONS, PERMISSION_ALL);
         }
@@ -397,6 +410,7 @@ public class MainActivity extends AppCompatActivity {
             if (ACTION_GATT_CONNECTED.equals(action)) {
                 Toast.makeText(getApplicationContext(),"Connected",Toast.LENGTH_LONG).show();
                 toggle.setEnabled(true);
+                appdata.setDeviceConnected(true);
             } else if (ACTION_GATT_DISCONNECTED.equals(action)) {
                 Toast.makeText(getApplicationContext(),"DisConnected",Toast.LENGTH_LONG).show();
                 toggle.setEnabled(false);
@@ -404,7 +418,31 @@ public class MainActivity extends AppCompatActivity {
                 displayData(intent.getStringExtra(EXTRA_DATA));
             }
             else if(ACTION_GATT_SERVICES_DISCOVERED.equals(action)){
+
                 Toast.makeText(getApplicationContext(),"Service Found",Toast.LENGTH_LONG).show();
+                appdata.setServiceDiscovered(true);
+                appdata.setTimeStamp(new Date().toString());
+                StringBuffer infoBuffer = new StringBuffer();
+                infoBuffer.append("Model :" + Build.MODEL + "\n");//The end-user-visible name for the end product.
+                infoBuffer.append("Device: " + Build.DEVICE + "\n");//The name of the industrial design.
+                infoBuffer.append("Manufacturer: " + Build.MANUFACTURER + "\n");//The manufacturer of the product/hardware.
+                infoBuffer.append("Board: " + Build.BOARD + "\n");//The name of the underlying board, like "goldfish".
+                infoBuffer.append("Brand: " + Build.BRAND + "\n");//The consumer-visible brand with which the product/hardware will be associated, if any.
+                infoBuffer.append("Serial: " + Build.SERIAL + "\n");
+                appdata.setDeviceName(infoBuffer.toString());
+
+                databaseReference.push().setValue(appdata).addOnSuccessListener(new OnSuccessListener<Void>() {
+                    @Override
+                    public void onSuccess(Void aVoid) {
+                        Toast.makeText(getApplicationContext(),"data stored in firebase",Toast.LENGTH_LONG).show();
+                    }
+                }).addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        Log.e("BLE",e.getMessage());
+
+                    }
+                });
             }
         }
     };
