@@ -1,9 +1,11 @@
 package in.vogo.iot.vogoble;
 
+import android.Manifest;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.app.ProgressDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
@@ -37,6 +39,7 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -60,6 +63,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int STATE_CONNECTING = 1;
     private static final int STATE_CONNECTED = 2;
     private int mConnectionState = STATE_DISCONNECTED;
+    private ProgressDialog dialog;
 
     private final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
         @Override
@@ -93,6 +97,9 @@ public class MainActivity extends AppCompatActivity {
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             BluetoothGattService services = gatt.getService(UUID.fromString("0000ffe0-0000-1000-8000-00805f9b34fb"));
             Log.i("onServicesDiscovered", services.toString());
+            if (dialog.isShowing()) {
+                dialog.dismiss();
+            }
             characteristic = services.getCharacteristic(UUID.fromString("0000ffe1-0000-1000-8000-00805f9b34fb"));
             notifyService(true);
             if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -128,7 +135,9 @@ public class MainActivity extends AppCompatActivity {
     int PERMISSION_ALL = 1;
     String[] PERMISSIONS = {
             android.Manifest.permission.ACCESS_FINE_LOCATION,
-            android.Manifest.permission.BLUETOOTH
+            android.Manifest.permission.BLUETOOTH,
+            Manifest.permission.BLUETOOTH_PRIVILEGED,
+            Manifest.permission.BLUETOOTH_ADMIN
     };
     Button toggle;
     boolean isunlocked = true;
@@ -144,7 +153,7 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(this, PERMISSIONS, PERMISSION_ALL);
         }
         toggle = (Button) findViewById(R.id.btn_major);
-
+        dialog = new ProgressDialog(this);
         mHandler = new Handler();
         if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
             Toast.makeText(this, "BLE Not Supported",
@@ -186,6 +195,9 @@ public class MainActivity extends AppCompatActivity {
             intentFilter.addAction(ACTION_GATT_DISCONNECTED);
             intentFilter.addAction(ACTION_GATT_SERVICES_DISCOVERED);
             intentFilter.addAction(EXTRA_DATA);
+            intentFilter.addAction(BluetoothDevice.ACTION_PAIRING_REQUEST);
+
+            intentFilter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY - 1);
             registerReceiver(mGattUpdateReceiver, intentFilter);
             if (Build.VERSION.SDK_INT >= 21) {
                 mLEScanner = mBluetoothAdapter.getBluetoothLeScanner();
@@ -237,6 +249,12 @@ public class MainActivity extends AppCompatActivity {
                     }
                 };
             }
+            if (dialog.isShowing()) {
+                dialog.dismiss();
+            }
+            dialog.setMessage("Connecting");
+//            dialog.setCancelable(false);
+            dialog.show();
             scanLeDevice(true);
         }
     }
@@ -252,6 +270,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (dialog.isShowing()) {
+            dialog.dismiss();
+        }
         unregisterReceiver(mGattUpdateReceiver);
         if (mGatt == null) {
             return;
@@ -377,7 +398,6 @@ public class MainActivity extends AppCompatActivity {
                 for(byte byteChar : data)
                     stringBuilder.append(String.format("%02X ", byteChar));
                 intent.putExtra(EXTRA_DATA, new String(data));
-
         }
         sendBroadcast(intent);
     }
@@ -388,6 +408,7 @@ public class MainActivity extends AppCompatActivity {
         if (mGatt == null) {
             return;
         }
+        deleteBondInformation(mGatt.getDevice());
         mGatt.close();
         mGatt = null;
     }
@@ -413,6 +434,27 @@ public class MainActivity extends AppCompatActivity {
             }
             else if(ACTION_GATT_SERVICES_DISCOVERED.equals(action)){
                 Toast.makeText(getApplicationContext(),"Service Found",Toast.LENGTH_LONG).show();
+            }
+            else if(BluetoothDevice.ACTION_PAIRING_REQUEST.equals(action)){
+                Log.d("Pairing Request", "Pairing");
+                final BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                int type = intent.getIntExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT, BluetoothDevice.ERROR);
+                int pin = intent.getIntExtra("android.bluetooth.device.extra.PAIRING_KEY", 123456);
+
+                byte[] pinBytes;
+                try {
+                    Log.d("BLE", ""+pin+" "+type);
+                    pinBytes = ("" + pin).getBytes("UTF-8");
+
+                    device.setPin("123456".getBytes());
+                    device.setPairingConfirmation(true);
+                    Log.d("BLE", "Setting pin");
+                }
+                catch (Exception e){
+                    Log.d("BLE","ERROR in PAIRING"+ e.getMessage());
+                }
+
+
             }
         }
     };
@@ -457,5 +499,18 @@ public class MainActivity extends AppCompatActivity {
 
         AlertDialog dialog = builder.create();
         dialog.show();
+    }
+
+    public static void deleteBondInformation(BluetoothDevice device)
+    {
+        try
+        {
+            Method m = device.getClass().getMethod("removeBond", (Class[]) null);
+            m.invoke(device, (Object[]) null);
+        }
+        catch (Exception e)
+        {
+            Log.e("BLE",e.getMessage());
+        }
     }
 }

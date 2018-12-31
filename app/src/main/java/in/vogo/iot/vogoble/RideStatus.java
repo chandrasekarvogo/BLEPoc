@@ -2,6 +2,7 @@ package in.vogo.iot.vogoble;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.ProgressDialog;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
@@ -32,6 +33,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -56,6 +58,8 @@ public class RideStatus extends AppCompatActivity {
     private int mConnectionState = STATE_DISCONNECTED;
     boolean ridePause = false;
     boolean bleConnected =false;
+    boolean reconnect = false;
+    private ProgressDialog dialog;
 
     private final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
         @Override
@@ -89,6 +93,9 @@ public class RideStatus extends AppCompatActivity {
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             BluetoothGattService services = gatt.getService(UUID.fromString("0000ffe0-0000-1000-8000-00805f9b34fb"));
             Log.i("onServicesDiscovered", services.toString());
+            if (dialog.isShowing()) {
+                dialog.dismiss();
+            }
             characteristic = services.getCharacteristic(UUID.fromString("0000ffe1-0000-1000-8000-00805f9b34fb"));
             notifyService(true);
             if (status == BluetoothGatt.GATT_SUCCESS) {
@@ -138,7 +145,7 @@ public class RideStatus extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_ride_status);
         Log.d("Oncreate", "RideActivity");
-
+        dialog = new ProgressDialog(this);
         if(!hasPermissions(this, PERMISSIONS)){
             ActivityCompat.requestPermissions(this, PERMISSIONS, PERMISSION_ALL);
         }
@@ -155,7 +162,7 @@ public class RideStatus extends AppCompatActivity {
         b1 = (Button) findViewById(R.id.ridePause);
         b2 = (Button) findViewById(R.id.rideEnd);
         final Handler handler = new Handler();
-
+        reconnect = false;
         b1.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -168,6 +175,12 @@ public class RideStatus extends AppCompatActivity {
                     handler.postDelayed(new Runnable() {
                         @Override
                         public void run() {
+                            if (dialog.isShowing()) {
+                                dialog.dismiss();
+                            }
+                            dialog.setMessage("Connecting");
+//            dialog.setCancelable(false);
+                            dialog.show();
                             scanLeDevice(true);
                         }
                     }, 2000);
@@ -187,6 +200,12 @@ public class RideStatus extends AppCompatActivity {
                     handler.postDelayed(new Runnable() {
                         @Override
                         public void run() {
+                            if (dialog.isShowing()) {
+                                dialog.dismiss();
+                            }
+                            dialog.setMessage("Connecting");
+//            dialog.setCancelable(false);
+                            dialog.show();
                             scanLeDevice(true);
                         }
                     }, 2000);
@@ -210,6 +229,9 @@ public class RideStatus extends AppCompatActivity {
             intentFilter.addAction(ACTION_GATT_DISCONNECTED);
             intentFilter.addAction(ACTION_GATT_SERVICES_DISCOVERED);
             intentFilter.addAction(EXTRA_DATA);
+            intentFilter.addAction(BluetoothDevice.ACTION_PAIRING_REQUEST);
+
+            intentFilter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY - 1);
             registerReceiver(mGattUpdateReceiver, intentFilter);
             if (Build.VERSION.SDK_INT >= 21) {
                 mLEScanner = mBluetoothAdapter.getBluetoothLeScanner();
@@ -277,6 +299,9 @@ public class RideStatus extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         unregisterReceiver(mGattUpdateReceiver);
+        if (dialog.isShowing()) {
+            dialog.dismiss();
+        }
         if (mGatt == null) {
             return;
         }
@@ -299,16 +324,16 @@ public class RideStatus extends AppCompatActivity {
     private void scanLeDevice(final boolean enable) {
         if (enable) {
             Toast.makeText(this,"Searching",Toast.LENGTH_SHORT).show();
-            mHandler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    if (Build.VERSION.SDK_INT < 21) {
-                        mBluetoothAdapter.stopLeScan(mLeScanCallback);
-                    } else {
-                        mLEScanner.stopScan(mScanCallback);
-                    }
-                }
-            }, SCAN_PERIOD);
+//            mHandler.postDelayed(new Runnable() {
+//                @Override
+//                public void run() {
+//                    if (Build.VERSION.SDK_INT < 21) {
+//                        mBluetoothAdapter.stopLeScan(mLeScanCallback);
+//                    } else {
+//                        mLEScanner.stopScan(mScanCallback);
+//                    }
+//                }
+//            }, SCAN_PERIOD);
             if (Build.VERSION.SDK_INT < 21) {
                 mBluetoothAdapter.startLeScan(mLeScanCallback);
             } else {
@@ -429,7 +454,9 @@ public class RideStatus extends AppCompatActivity {
                 Toast.makeText(getApplicationContext(),"Connected",Toast.LENGTH_LONG).show();
               //  toggle.setEnabled(true);
             } else if (ACTION_GATT_DISCONNECTED.equals(action)) {
-                Toast.makeText(getApplicationContext(),"DisConnected",Toast.LENGTH_LONG).show();
+                Toast.makeText(getApplicationContext(),"Disconnected",Toast.LENGTH_LONG).show();
+                deleteBondInformation(mGatt.getDevice());
+                close();
               //  toggle.setEnabled(false);
             }  else if (ACTION_DATA_AVAILABLE.equals(action)) {
                 displayData(intent.getStringExtra(EXTRA_DATA));
@@ -437,28 +464,69 @@ public class RideStatus extends AppCompatActivity {
             else if(ACTION_GATT_SERVICES_DISCOVERED.equals(action)){
                 Toast.makeText(getApplicationContext(),"Service Found",Toast.LENGTH_LONG).show();
                 bleConnected = true;
-                if(ridePause)
-                    send("3".getBytes());
-                else
-                    send("2".getBytes());
+
+                if(reconnect){
+                    if(ridePause)
+                        send("5".getBytes());
+                    else
+                        send("4".getBytes());
+                }
+                else {
+                    if (ridePause)
+                        send("3".getBytes());
+                    else
+                        send("2".getBytes());
+                }
+            }
+            else if(BluetoothDevice.ACTION_PAIRING_REQUEST.equals(action)){
+                Log.d("Pairing Request", "Pairing");
+                final BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                int type = intent.getIntExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT, BluetoothDevice.ERROR);
+
+
+                    device.setPin("123456".getBytes());
+                    device.setPairingConfirmation(true);
+                    Log.d("BLE","Setting pin");
+
             }
         }
     };
     Runnable r = new Runnable() {
         @Override
         public void run() {
+            deleteBondInformation(mGatt.getDevice());
             close();
         }
     };
     private void displayData(String stringExtra) {
 
-        if(stringExtra.equalsIgnoreCase("0")) {
-            Toast.makeText(this,stringExtra+" Failed",Toast.LENGTH_LONG).show();
-            mHandler.postDelayed(r, 10000);
-          //  showDialog();
+        Log.d("BLE readings", stringExtra
+        );
+        int delayMillis = 30000;
+        if(stringExtra.equalsIgnoreCase("000")) {
+            reconnect = false;
+            action(stringExtra, delayMillis, "Make sure helmets,handle and seats are locked");
+            return;
         }
-        else if(stringExtra.equalsIgnoreCase("1")){
-            Toast.makeText(this,stringExtra,Toast.LENGTH_LONG).show();
+        else if(stringExtra.equalsIgnoreCase("002")) {
+            reconnect = false;
+            action(stringExtra, delayMillis, "please lock the seat and handle");
+        }
+        else if(stringExtra.indexOf('0') > -1){
+            reconnect = false;
+            switch (stringExtra.indexOf('0')){
+                case 0: action(stringExtra, delayMillis, "Please Lock the Handles"); break;
+                case 1: action(stringExtra, delayMillis, "Please Lock the seat"); break;
+                case 2: action(stringExtra, delayMillis, "Please place the helmets inside"); break;
+            }
+        }
+        else if(stringExtra.equalsIgnoreCase("111")) {
+            reconnect =false;
+            action(stringExtra, delayMillis, "Please place another helmet");
+        }
+        else if(stringExtra.equalsIgnoreCase("112")) {
+            Toast.makeText(this,stringExtra + "Success",Toast.LENGTH_LONG).show();
+            showDialog("Success");
             Log.d("BLE", "done");
             close();
 
@@ -466,31 +534,62 @@ public class RideStatus extends AppCompatActivity {
             intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             startActivity(intent);
         }
+        else if(stringExtra.equalsIgnoreCase("2") || stringExtra.equalsIgnoreCase("3")) {
+
+            /**
+             * BLE in on master mode . Wait 6000 millis .and rescan
+             */
+
+            scanLeDevice(false);
+            Handler h = new Handler();
+            h.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    reconnect = true;
+                    if (dialog.isShowing()) {
+                        dialog.dismiss();
+                    }
+                    dialog.setMessage("Connecting");
+//            dialog.setCancelable(false);
+                    dialog.show();
+                    scanLeDevice(true);
+                }
+            },15000);
+        }
         else{
-            Toast.makeText(this,stringExtra,Toast.LENGTH_SHORT).show();
+             Toast.makeText(this,stringExtra,Toast.LENGTH_SHORT).show();
         }
     }
 
+    private void action(String stringExtra, int delayMillis, String s) {
+        Toast.makeText(this, stringExtra + " Failed", Toast.LENGTH_LONG).show();
+        mHandler.postDelayed(r, delayMillis);  // setting Time out to 30 Sec
+        showDialog(s);
+    }
 
-    private void showDialog(){
-        String[] actions = {"Pause Ride","End Ride"};
+
+    private void showDialog(String message) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("What you like to do").setItems(actions, new DialogInterface.OnClickListener() {
+        builder.setTitle("Alert").setMessage(message).setPositiveButton("Ok", new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
-
-                if(which==0){
-                    send("5".getBytes());
-                }
-                else if(which==1){
-                    send("6".getBytes());
-                }
-
                 dialog.dismiss();
             }
         });
-
         AlertDialog dialog = builder.create();
         dialog.show();
     }
+    public static void deleteBondInformation(BluetoothDevice device)
+    {
+        try
+        {
+            Method m = device.getClass().getMethod("removeBond", (Class[]) null);
+            m.invoke(device, (Object[]) null);
+        }
+        catch (Exception e)
+        {
+            Log.e("BLE",e.getMessage());
+        }
+    }
+
 }
